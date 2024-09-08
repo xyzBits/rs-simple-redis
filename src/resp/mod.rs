@@ -1,9 +1,11 @@
 mod decode;
 mod encode;
 
+use bytes::BytesMut;
 use enum_dispatch::enum_dispatch;
 use std::collections::BTreeMap;
 use std::ops::{Deref, DerefMut};
+use thiserror::Error;
 
 #[enum_dispatch]
 pub trait RespEncode {
@@ -11,8 +13,14 @@ pub trait RespEncode {
 }
 
 pub trait RespDecode {
-    fn decode(buf: Self) -> Result<RespFrame, String>;
+    const PREFIX: &'static str;
+    fn decode(buf: &mut BytesMut) -> Result<RespFrame, RespError>;
+
+    fn expect_length(buf: &[u8]) -> Result<usize, RespError>;
 }
+
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum RespError {}
 
 // 枚举中的这些成员的 结构，都要实现 RespEncode，否则 编译无法通过
 #[enum_dispatch(RespEncode)]
