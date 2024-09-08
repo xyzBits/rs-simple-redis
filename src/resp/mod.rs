@@ -7,7 +7,7 @@ use std::ops::{Deref, DerefMut};
 
 #[enum_dispatch]
 pub trait RespEncode {
-    fn encode(&self) -> Vec<u8>;
+    fn encode(self) -> Vec<u8>;
 }
 
 pub trait RespDecode {
