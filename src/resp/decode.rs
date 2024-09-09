@@ -16,7 +16,10 @@
     - set: "~<number-of-elements>\r\n<element-1>...<element-n>"
  */
 
-use crate::{RespDecode, RespEncode, RespError, RespFrame, SimpleString};
+use crate::{
+    BulkString, RespArray, RespDecode, RespEncode, RespError, RespFrame, RespMap, RespNull,
+    RespNullArray, RespNullBulkString, RespSet, SimpleError, SimpleString,
+};
 use anyhow::Result;
 use bytes::BytesMut;
 
@@ -42,6 +45,162 @@ impl RespDecode for SimpleString {
     fn expect_length(buf: &[u8]) -> std::result::Result<usize, RespError> {
         todo!()
     }
+}
+
+impl RespDecode for SimpleError {
+    const PREFIX: &'static str = "-";
+
+    fn decode(buf: &mut BytesMut) -> std::result::Result<RespFrame, RespError> {
+        todo!()
+    }
+
+    fn expect_length(buf: &[u8]) -> std::result::Result<usize, RespError> {
+        todo!()
+    }
+}
+
+impl RespDecode for RespNull {
+    const PREFIX: &'static str = "_";
+
+    fn decode(buf: &mut BytesMut) -> std::result::Result<RespFrame, RespError> {
+        todo!()
+    }
+
+    fn expect_length(buf: &[u8]) -> std::result::Result<usize, RespError> {
+        todo!()
+    }
+}
+
+impl RespDecode for RespNullArray {
+    const PREFIX: &'static str = "*";
+
+    fn decode(buf: &mut BytesMut) -> std::result::Result<RespFrame, RespError> {
+        todo!()
+    }
+
+    fn expect_length(buf: &[u8]) -> std::result::Result<usize, RespError> {
+        todo!()
+    }
+}
+
+impl RespDecode for RespNullBulkString {
+    const PREFIX: &'static str = "$";
+
+    fn decode(buf: &mut BytesMut) -> std::result::Result<RespFrame, RespError> {
+        todo!()
+    }
+
+    fn expect_length(buf: &[u8]) -> std::result::Result<usize, RespError> {
+        todo!()
+    }
+}
+
+impl RespDecode for i64 {
+    const PREFIX: &'static str = ":";
+
+    fn decode(buf: &mut BytesMut) -> std::result::Result<RespFrame, RespError> {
+        todo!()
+    }
+
+    fn expect_length(buf: &[u8]) -> std::result::Result<usize, RespError> {
+        todo!()
+    }
+}
+
+impl RespDecode for bool {
+    const PREFIX: &'static str = "#";
+
+    fn decode(buf: &mut BytesMut) -> std::result::Result<RespFrame, RespError> {
+        todo!()
+    }
+
+    fn expect_length(buf: &[u8]) -> std::result::Result<usize, RespError> {
+        todo!()
+    }
+}
+
+impl RespDecode for BulkString {
+    const PREFIX: &'static str = "$";
+
+    fn decode(buf: &mut BytesMut) -> std::result::Result<RespFrame, RespError> {
+        todo!()
+    }
+
+    fn expect_length(buf: &[u8]) -> std::result::Result<usize, RespError> {
+        todo!()
+    }
+}
+
+impl RespDecode for RespArray {
+    const PREFIX: &'static str = "*";
+
+    fn decode(buf: &mut BytesMut) -> std::result::Result<RespFrame, RespError> {
+        todo!()
+    }
+
+    fn expect_length(buf: &[u8]) -> std::result::Result<usize, RespError> {
+        todo!()
+    }
+}
+
+impl RespDecode for f64 {
+    const PREFIX: &'static str = ",";
+
+    fn decode(buf: &mut BytesMut) -> std::result::Result<RespFrame, RespError> {
+        todo!()
+    }
+
+    fn expect_length(buf: &[u8]) -> std::result::Result<usize, RespError> {
+        todo!()
+    }
+}
+
+impl RespDecode for RespMap {
+    const PREFIX: &'static str = "%";
+
+    fn decode(buf: &mut BytesMut) -> std::result::Result<RespFrame, RespError> {
+        todo!()
+    }
+
+    fn expect_length(buf: &[u8]) -> std::result::Result<usize, RespError> {
+        todo!()
+    }
+}
+
+impl RespDecode for RespSet {
+    const PREFIX: &'static str = "~";
+
+    fn decode(buf: &mut BytesMut) -> std::result::Result<RespFrame, RespError> {
+        todo!()
+    }
+
+    fn expect_length(buf: &[u8]) -> std::result::Result<usize, RespError> {
+        todo!()
+    }
+}
+
+fn extract_fixed_data(
+    buf: &mut BytesMut,
+    expect: &str,
+    expect_type: &str,
+) -> Result<(), RespError> {
+    todo!()
+}
+
+fn extract_simple_frame_data(buf: &[u8], prefix: &str) -> Result<usize, RespError> {
+    todo!()
+}
+
+fn find_crlf(buf: &[u8], nth: usize) -> Option<usize> {
+    todo!()
+}
+
+fn parse_length(buf: &[u8], prefix: &str) -> Result<(usize, usize), RespError> {
+    todo!()
+}
+
+fn calc_total_length(buf: &[u8], end: usize, len: usize, prefix: &str) -> Result<usize, RespError> {
+    todo!()
 }
 
 #[cfg(test)]

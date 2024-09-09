@@ -20,7 +20,28 @@ pub trait RespDecode {
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]
-pub enum RespError {}
+pub enum RespError {
+    #[error("Invalid frame: {0}")]
+    InvalidFrame(String),
+
+    #[error("Invalid frame type: {0}")]
+    InvalidFrameType(String),
+
+    #[error("Invalid frame length: {0}")]
+    InvalidFrameLength(isize),
+
+    #[error("Frame is not complete")]
+    NotComplete,
+
+    #[error("Parse error: {0}")]
+    ParseIntError(#[from] std::num::ParseIntError),
+
+    #[error("Utf8 error: {0}")]
+    Utf8Error(#[from] std::str::Utf8Error),
+
+    #[error("Parse float error: {0}")]
+    ParseFloatError(#[from] std::num::ParseFloatError),
+}
 
 // 枚举中的这些成员的 结构，都要实现 RespEncode，否则 编译无法通过
 #[enum_dispatch(RespEncode)]
