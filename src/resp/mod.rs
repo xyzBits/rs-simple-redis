@@ -9,6 +9,7 @@ use thiserror::Error;
 
 #[enum_dispatch]
 pub trait RespEncode {
+    // 为什么要把 self 直接 consume
     fn encode(self) -> Vec<u8>;
 }
 
@@ -99,6 +100,7 @@ pub struct RespMap(BTreeMap<String, RespFrame>);
 #[derive(Debug, PartialEq, PartialOrd)]
 pub struct RespSet(Vec<RespFrame>);
 
+// 我们要直接访问里面包裹的数据，所以需要 deref
 impl Deref for SimpleString {
     type Target = String;
 
