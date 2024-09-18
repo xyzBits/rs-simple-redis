@@ -7,6 +7,7 @@ use std::collections::BTreeMap;
 use std::ops::{Deref, DerefMut};
 use thiserror::Error;
 
+// trait 上也要注明 enum dispatch
 #[enum_dispatch]
 pub trait RespEncode {
     // 为什么要把 self 直接 consume
@@ -44,6 +45,8 @@ pub enum RespError {
     ParseFloatError(#[from] std::num::ParseFloatError),
 }
 
+// 在 enum 上注明你要使用哪个 trait ，然后 enum 的成员都要实现 这个 trait
+// enum dispatch 会为 enum 中的成员实现 from 和 into
 // 枚举中的这些成员的 结构，都要实现 RespEncode，否则 编译无法通过
 #[enum_dispatch(RespEncode)]
 #[derive(Debug, PartialEq, PartialOrd)]
@@ -72,6 +75,12 @@ pub enum RespFrame {
 
     Set(RespSet),
 }
+
+// impl RespFrame {
+//     pub fn encode(&self) -> Vec<u8> {
+//         todo!()
+//     }
+// }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd)]
 pub struct SimpleString(String);
@@ -141,6 +150,7 @@ impl Deref for RespMap {
     }
 }
 
+// 实现了 deref 只能使用 immutable deref
 impl DerefMut for RespMap {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0

@@ -1,5 +1,5 @@
 use enum_dispatch::enum_dispatch;
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 
 #[enum_dispatch(Hello)]
 #[derive(Debug, PartialEq, Eq, PartialOrd)]
@@ -54,4 +54,30 @@ impl From<Female> for Gender {
 fn test_enum_into() {
     // 实现了还是不行
     // let gender: Gender = Male::new("tom").into();
+}
+
+#[test]
+fn test_deref_mut() {
+    struct DerefMutExample<T> {
+        value: T,
+    }
+
+    impl<T> Deref for DerefMutExample<T> {
+        type Target = T;
+
+        fn deref(&self) -> &Self::Target {
+            &self.value
+        }
+    }
+
+    impl<T> DerefMut for DerefMutExample<T> {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.value
+        }
+    }
+
+    let mut x = DerefMutExample { value: 'a' };
+
+    *x = 'b';
+    assert_eq!('b', x.value);
 }

@@ -188,6 +188,7 @@ mod tests {
 
     #[test]
     fn test_simple_string_encode() {
+        // into 自动被 enum_dispatch 实现了
         let frame: RespFrame = SimpleString::new("OK".to_string()).into();
 
         // 这个 decode 由 enum_dispatch 实现提供
