@@ -16,11 +16,15 @@ pub trait RespEncode {
 
 pub trait RespDecode {
     const PREFIX: &'static str;
+
+    // 拿到一个 bytesMut，然后对里面的数据进行 decode
     fn decode(buf: &mut BytesMut) -> Result<RespFrame, RespError>;
 
     fn expect_length(buf: &[u8]) -> Result<usize, RespError>;
 }
 
+/// anyhow 帮你自动 convert error
+/// this error 灵活的转换 error
 #[derive(Debug, Error, PartialEq, Eq)]
 pub enum RespError {
     #[error("Invalid frame: {0}")]

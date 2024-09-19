@@ -70,6 +70,7 @@ fn test_deref_mut() {
         }
     }
 
+    // 如果没有实现 DerefMut，就无法把 实例声明为 mut 并且 使用 解引用的操作
     impl<T> DerefMut for DerefMutExample<T> {
         fn deref_mut(&mut self) -> &mut Self::Target {
             &mut self.value

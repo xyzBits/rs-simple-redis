@@ -23,11 +23,27 @@ use crate::{
 use anyhow::Result;
 use bytes::BytesMut;
 
+const CRLF: &[u8] = b"\r\n";
+const CRLF_LEN: usize = CRLF.len();
+
 impl RespDecode for RespFrame {
     const PREFIX: &'static str = "";
 
     fn decode(buf: &mut BytesMut) -> std::result::Result<RespFrame, RespError> {
-        todo!()
+        // 返回一个迭代器
+        let mut iter = buf.iter().peekable();
+
+        match iter.peek() {
+            Some(b'+') => {
+                let frame = SimpleString::decode(buf)?;
+                Ok(frame.into())
+            }
+
+            _ => Err(RespError::InvalidFrameType(format!(
+                "expect_length: unknown frame type: {:?}",
+                buf
+            ))),
+        }
     }
 
     fn expect_length(buf: &[u8]) -> std::result::Result<usize, RespError> {
