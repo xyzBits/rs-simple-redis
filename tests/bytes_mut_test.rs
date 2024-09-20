@@ -1,4 +1,4 @@
-use bytes::{BufMut, BytesMut};
+use bytes::{Buf, BufMut, BytesMut};
 
 #[test]
 fn test_bytes_mut() {
@@ -35,4 +35,33 @@ fn test_peekable() {
     let mut iter = xs.iter().peekable();
 
     assert_eq!(iter.peek_mut(), Some(&mut &1));
+}
+
+#[test]
+fn test_bytes_mut_start_with() {
+    let mut bytes = BytesMut::new();
+    bytes.put_slice(b"hello");
+
+    let res = bytes.starts_with(&"h".as_bytes());
+    println!("{}", res);
+}
+
+#[test]
+fn test_bytes_mut_split() {
+    let mut a = BytesMut::from(&b"hello world"[..]);
+
+    // Splits the buffer into two at the given index.
+    // Afterwards self contains elements [at, len), and the returned BytesMut contains elements [0, at).
+    let b = a.split_to(5);
+
+    println!("{:?}", String::from_utf8_lossy(&a[..]));
+
+    println!("{}", String::from_utf8_lossy(&b));
+}
+
+#[test]
+fn test_bytes_mut_advance() {
+    let mut buf = BytesMut::from(b"hello world");
+
+    buf.advance(3);
 }
