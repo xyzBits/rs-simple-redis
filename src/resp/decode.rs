@@ -423,6 +423,18 @@ fn calc_total_length(buf: &[u8], end: usize, len: usize, prefix: &str) -> Result
     }
 }
 
+impl RespDecode for Vec<u8> {
+    const PREFIX: &'static str = "/";
+
+    fn decode(buf: &mut BytesMut) -> Result<Self, RespError> {
+        todo!()
+    }
+
+    fn expect_length(buf: &[u8]) -> Result<usize, RespError> {
+        todo!()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

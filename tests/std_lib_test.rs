@@ -1,4 +1,5 @@
 use enum_dispatch::enum_dispatch;
+use rs_simple_redis::RespFrame::SimpleString;
 use std::borrow::Cow;
 use std::ops::{Deref, DerefMut};
 
@@ -51,10 +52,22 @@ impl From<Female> for Gender {
     }
 }
 
+impl From<Male> for Gender {
+    fn from(value: Male) -> Self {
+        Gender::Male(value)
+    }
+}
+
+fn create_gender() -> anyhow::Result<Gender> {
+    Ok(Male::new("tom").into())
+}
+
 #[test]
 fn test_enum_into() {
     // 实现了还是不行
-    // let gender: Gender = Male::new("tom").into();
+    let gender: Gender = Male::new("tom").into();
+
+    let gender = Gender::from(Male::new("jack"));
 }
 
 #[test]

@@ -14,7 +14,9 @@ pub trait RespEncode {
     fn encode(self) -> Vec<u8>;
 }
 
-// decode 将字节数据转为 需要的数据结构
+/// decode 将字节数据转为 需要的数据结构
+/// 表示一个类型的大小在编译期是已知的，也就是说，编译器可以在编译时确定该类型所占的内存空间
+/// 实现 RespDecode 的 类型必须有固定的大小，意味着实现这个 trait 的类型不能是动态大小的类型，例如 Vec<T> String
 pub trait RespDecode: Sized {
     const PREFIX: &'static str;
 
@@ -257,5 +259,15 @@ impl<const N: usize> From<&[u8; N]> for BulkString {
 impl<const N: usize> From<&[u8; N]> for RespFrame {
     fn from(s: &[u8; N]) -> Self {
         BulkString(s.to_vec()).into()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{RespFrame, SimpleString};
+
+    #[test]
+    fn test_convert() {
+        let frame: RespFrame = SimpleString::new("tome").into();
     }
 }
