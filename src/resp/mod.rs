@@ -56,7 +56,7 @@ pub enum RespError {
 // enum dispatch 会为 enum 中的成员实现 from 和 into
 // 枚举中的这些成员的 结构，都要实现 RespEncode，否则 编译无法通过
 #[enum_dispatch(RespEncode)]
-#[derive(Debug, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum RespFrame {
     SimpleString(SimpleString),
 

@@ -41,12 +41,29 @@ impl Backend {
     }
 
     pub fn get(&self, key: &str) -> Option<RespFrame> {
-        let option = self.map.get(key).map(|v| v.value()).map(|v| v.clone());
-
-        option
+        self.map
+            .get(key)
+            // RespFrame 需要实现 Clone
+            .map(|v| v.value().clone())
     }
 
     pub fn set(&self, key: String, value: RespFrame) {
         self.map.insert(key, value);
+    }
+
+    pub fn hget(&self, key: &str, field: &str) -> Option<RespFrame> {
+        self.hmap.get(key).and_then(|v|
+                // 内层 dashMap的处理
+                v.get(field)
+                    .map(|v| v.value().clone()))
+    }
+
+    pub fn hset(&self, key: String, field: String, value: RespFrame) {
+        let hmap = self.hmap.entry(key).or_default();
+        hmap.insert(field, value);
+    }
+
+    pub fn hgetall(&self, key: &str) -> Option<DashMap<String, RespFrame>> {
+        self.hmap.get(key).map(|v| v.clone())
     }
 }
