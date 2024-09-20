@@ -14,11 +14,12 @@ pub trait RespEncode {
     fn encode(self) -> Vec<u8>;
 }
 
-pub trait RespDecode {
+// decode 将字节数据转为 需要的数据结构
+pub trait RespDecode: Sized {
     const PREFIX: &'static str;
 
     // 拿到一个 bytesMut，然后对里面的数据进行 decode
-    fn decode(buf: &mut BytesMut) -> Result<RespFrame, RespError>;
+    fn decode(buf: &mut BytesMut) -> Result<Self, RespError>;
 
     fn expect_length(buf: &[u8]) -> Result<usize, RespError>;
 }
