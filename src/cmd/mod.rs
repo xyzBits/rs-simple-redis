@@ -41,6 +41,8 @@ pub enum Command {
 
     HGet(HGet),
 
+    HSet(HSet),
+
     HGetAll(HGetAll),
 }
 
