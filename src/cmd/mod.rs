@@ -1,4 +1,4 @@
-use crate::{Backend, BulkString, RespArray, RespError, RespFrame, SimpleString};
+use crate::{Backend, RespArray, RespError, RespFrame, SimpleString};
 use enum_dispatch::enum_dispatch;
 use lazy_static::lazy_static;
 use thiserror::Error;
@@ -6,9 +6,9 @@ use thiserror::Error;
 mod hmap;
 mod map;
 
-/// 宏的作用是定义一个静态变量，并且保证这个变量在第一次被使用的时候才会被初始化
-/// 可以确保在多线程环境下，变量只会被初始化一次，从而避免了竞态条件的发生
-/// 生命周期与整个程序相同
+// 宏的作用是定义一个静态变量，并且保证这个变量在第一次被使用的时候才会被初始化
+// 可以确保在多线程环境下，变量只会被初始化一次，从而避免了竞态条件的发生
+// 生命周期与整个程序相同
 lazy_static! {
     static ref RESP_OK: RespFrame = SimpleString::new("OK").into();
 }
@@ -24,6 +24,7 @@ pub enum CommandError {
     #[error("{0}")]
     RespError(#[from] RespError),
 
+    // `?` could not convert error type `FromUtf8Error` to `CommandError`
     // 当编译器返回一个 std::string::FromUtf8Error 时，编译器会自动转换为 Utf8Error
     // {0} 是一个点位符，在发生错误时，将信息填充进来
     #[error("Utf8 error: {0}")]
@@ -110,9 +111,36 @@ fn validate_command(
     names: &[&'static str],
     n_args: usize,
 ) -> Result<(), CommandError> {
-    todo!()
+    if value.len() != n_args + names.len() {
+        return Err(CommandError::InvalidArgument(format!(
+            "{} command must have exactly {} argument",
+            names.join(" "),
+            n_args
+        )));
+    }
+
+    for (i, name) in names.iter().enumerate() {
+        match value[i] {
+            RespFrame::BulkString(ref cmd) => {
+                if cmd.as_ref().to_ascii_lowercase() != name.as_bytes() {
+                    return Err(CommandError::InvalidCommand(format!(
+                        "Invalid command: expected {}, got {}",
+                        name,
+                        String::from_utf8_lossy(cmd.as_ref())
+                    )));
+                }
+            }
+            _ => {
+                return Err(CommandError::InvalidCommand(
+                    "Command must have a BulkString as the first argument".to_string(),
+                ))
+            }
+        }
+    }
+
+    Ok(())
 }
 
 fn extract_args(value: RespArray, start: usize) -> Result<Vec<RespFrame>, CommandError> {
-    todo!()
+    Ok(value.0.into_iter().skip(start).collect::<Vec<RespFrame>>())
 }

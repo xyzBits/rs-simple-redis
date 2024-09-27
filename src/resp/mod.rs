@@ -96,13 +96,13 @@ pub struct SimpleString(String);
 pub struct SimpleError(String);
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
-pub struct BulkString(Vec<u8>);
+pub struct BulkString(pub(crate) Vec<u8>);
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
 pub struct RespNull;
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
-pub struct RespArray(Vec<RespFrame>);
+pub struct RespArray(pub(crate) Vec<RespFrame>);
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
 pub struct RespNullArray;
@@ -268,6 +268,7 @@ impl AsRef<str> for SimpleString {
     }
 }
 
+// 用于将一个类型转换为另一个类型的引用
 impl AsRef<[u8]> for BulkString {
     fn as_ref(&self) -> &[u8] {
         &self.0

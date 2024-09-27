@@ -1,5 +1,4 @@
 use enum_dispatch::enum_dispatch;
-use rs_simple_redis::RespFrame::SimpleString;
 use std::borrow::Cow;
 use std::ops::{Deref, DerefMut};
 
@@ -131,4 +130,39 @@ fn test_ok_or() {
 
     let x: Option<&str> = None;
     assert_eq!(x.ok_or(0), Err(0));
+}
+
+#[cfg(test)]
+mod ref_tests {
+    #[test]
+    fn test_ref() {
+        let x = 5;
+
+        match x {
+            // ref r 将 x 的引用绑定到 r上
+            ref r => println!("r: {}", r),
+            _ => println!("None"),
+        }
+
+        let x = Box::new(5i32);
+        let y: &i32 = &x;
+        println!("{}", y);
+
+        let x1 = x.as_ref();
+        println!("{}", x1);
+    }
+
+    fn is_hello<T: AsRef<str>>(s: T) {
+        assert_eq!("hello", s.as_ref());
+    }
+
+    #[test]
+    fn test_is_hello() {
+        let s = "hello";
+
+        is_hello(s);
+
+        let s = "hello".to_string();
+        is_hello(s);
+    }
 }
