@@ -57,8 +57,8 @@ impl TryFrom<RespArray> for Set {
 
 #[cfg(test)]
 mod tests {
-    use crate::cmd::Get;
-    use crate::{RespArray, RespDecode};
+    use crate::cmd::{Get, Set};
+    use crate::{RespArray, RespDecode, RespFrame};
     use anyhow::Result;
     use bytes::BytesMut;
 
@@ -73,6 +73,24 @@ mod tests {
         println!("{:?}", result);
 
         assert_eq!(result.key, "hello");
+        Ok(())
+    }
+
+    #[test]
+    fn test_set_from_resp_array() -> Result<()> {
+        let mut buf = BytesMut::new();
+        buf.extend_from_slice(b"*3\r\n$3\r\nset\r\n$5\r\nhello\r\n$5\r\nworld\r\n");
+
+        let frame = RespArray::decode(&mut buf)?;
+
+        let result: Set = frame.try_into()?;
+
+        println!("{:?}", result);
+
+        assert_eq!(result.key, "hello");
+        // into 方法在 From<&[u8]> 中实现
+        assert_eq!(result.value, RespFrame::BulkString(b"world".into()));
+
         Ok(())
     }
 }

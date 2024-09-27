@@ -166,3 +166,34 @@ mod ref_tests {
         is_hello(s);
     }
 }
+
+#[cfg(test)]
+mod try_from_tests {
+    struct GreaterThanZero(i32);
+
+    impl TryFrom<i32> for GreaterThanZero {
+        type Error = &'static str;
+
+        fn try_from(value: i32) -> Result<Self, Self::Error> {
+            if value <= 0 {
+                Err("GreaterThan only accepts values greater than 0")
+            } else {
+                Ok(GreaterThanZero(value))
+            }
+        }
+    }
+
+    #[test]
+    fn test_gt() {
+        let big_number = 1_000_000_000_000_i64;
+        let smaller_number = big_number as i32;
+        assert_eq!(smaller_number, -727379968);
+
+        let try_smaller_number = i32::try_from(big_number);
+        assert!(try_smaller_number.is_err());
+
+        let try_successful_smaller_number = i32::try_from(3);
+
+        assert!(try_successful_smaller_number.is_ok());
+    }
+}
