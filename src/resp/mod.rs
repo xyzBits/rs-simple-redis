@@ -262,6 +262,18 @@ impl<const N: usize> From<&[u8; N]> for RespFrame {
     }
 }
 
+impl AsRef<str> for SimpleString {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl AsRef<[u8]> for BulkString {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::{RespFrame, SimpleString};

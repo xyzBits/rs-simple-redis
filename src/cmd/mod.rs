@@ -1,4 +1,4 @@
-use crate::{Backend, RespError, RespFrame, SimpleString};
+use crate::{Backend, BulkString, RespArray, RespError, RespFrame, SimpleString};
 use enum_dispatch::enum_dispatch;
 use lazy_static::lazy_static;
 use thiserror::Error;
@@ -24,6 +24,8 @@ pub enum CommandError {
     #[error("{0}")]
     RespError(#[from] RespError),
 
+    // 当编译器返回一个 std::string::FromUtf8Error 时，编译器会自动转换为 Utf8Error
+    // {0} 是一个点位符，在发生错误时，将信息填充进来
     #[error("Utf8 error: {0}")]
     Utf8Error(#[from] std::string::FromUtf8Error),
 }
@@ -73,4 +75,44 @@ pub struct HSet {
 #[derive(Debug)]
 pub struct HGetAll {
     key: String,
+}
+
+#[derive(Debug)]
+pub struct Unrecognized;
+
+// RespArray 是一个 RespFrame 的 vector
+impl TryFrom<RespArray> for Command {
+    type Error = CommandError;
+
+    fn try_from(value: RespArray) -> Result<Self, Self::Error> {
+        match value.first() {
+            Some(RespFrame::BulkString(ref cmd)) => match cmd.as_ref() {
+                b"get" => Ok(Get::try_from(value)?.into()),
+                b"set" => Ok(Set::try_from(value)?.into()),
+                b"hget" => Ok(HGet::try_from(value)?.into()),
+                b"hset" => Ok(HSet::try_from(value)?.into()),
+                b"hgetall" => Ok(HGetAll::try_from(value)?.into()),
+                _ => Err(CommandError::InvalidCommand(format!(
+                    "Invalid command: {}",
+                    String::from_utf8_lossy(cmd.as_ref())
+                ))),
+            },
+
+            _ => Err(CommandError::InvalidCommand(
+                "Command mut have a BulkString as the first argument".to_string(),
+            )),
+        }
+    }
+}
+
+fn validate_command(
+    value: &RespArray,
+    names: &[&'static str],
+    n_args: usize,
+) -> Result<(), CommandError> {
+    todo!()
+}
+
+fn extract_args(value: RespArray, start: usize) -> Result<Vec<RespFrame>, CommandError> {
+    todo!()
 }
