@@ -83,6 +83,19 @@ pub struct HGetAll {
 #[derive(Debug)]
 pub struct Unrecognized;
 
+impl TryFrom<RespFrame> for Command {
+    type Error = CommandError;
+
+    fn try_from(value: RespFrame) -> Result<Self, Self::Error> {
+        match value {
+            RespFrame::Array(array) => array.try_into(),
+            _ => Err(CommandError::InvalidCommand(
+                "Command mut be an array".to_string(),
+            )),
+        }
+    }
+}
+
 // RespArray 是一个 RespFrame 的 vector
 impl TryFrom<RespArray> for Command {
     type Error = CommandError;
@@ -105,6 +118,12 @@ impl TryFrom<RespArray> for Command {
                 "Command mut have a BulkString as the first argument".to_string(),
             )),
         }
+    }
+}
+
+impl CommandExecutor for Unrecognized {
+    fn execute(self, _: &Backend) -> RespFrame {
+        RESP_OK.clone()
     }
 }
 

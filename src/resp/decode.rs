@@ -21,6 +21,7 @@ use crate::{
     RespNullBulkString, RespSet, SimpleError, SimpleString,
 };
 use bytes::{Buf, BytesMut};
+use tracing::info;
 
 const CRLF: &[u8] = b"\r\n";
 const CRLF_LEN: usize = CRLF.len();
@@ -55,6 +56,7 @@ impl RespDecode for RespFrame {
             }
             Some(b'*') => {
                 // try null array first
+                info!("decode buf start with *");
                 match RespNullArray::decode(buf) {
                     Ok(frame) => Ok(frame.into()),
                     Err(RespError::NotComplete) => Err(RespError::NotComplete),

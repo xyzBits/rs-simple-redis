@@ -1,6 +1,9 @@
+use dashmap::DashMap;
 use enum_dispatch::enum_dispatch;
 use std::borrow::Cow;
 use std::ops::{Deref, DerefMut};
+use std::sync::Arc;
+use std::time::Duration;
 
 #[enum_dispatch(Hello)]
 #[derive(Debug, PartialEq, Eq, PartialOrd)]
@@ -196,4 +199,29 @@ mod try_from_tests {
 
         assert!(try_successful_smaller_number.is_ok());
     }
+}
+
+#[tokio::test]
+async fn test_dash_map() {
+    let mut map = Arc::new(DashMap::new());
+
+    let map1 = map.clone();
+    tokio::spawn(async move {
+        map1.insert("hello".to_string(), 1);
+    });
+
+    let map2 = map.clone();
+    tokio::spawn(async move {
+        map2.insert("hello".to_string(), 2);
+    });
+
+    tokio::time::sleep(Duration::from_secs(5)).await;
+
+    println!("{:?}", map.get(&"hello".to_string()));
+}
+
+#[test]
+fn test_string_to_bytes() {
+    let res = b"set";
+    println!("{:?}", res);
 }
