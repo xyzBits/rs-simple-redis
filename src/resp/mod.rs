@@ -238,6 +238,12 @@ impl From<&str> for BulkString {
     }
 }
 
+impl From<String> for BulkString {
+    fn from(value: String) -> Self {
+        BulkString(value.as_bytes().to_vec())
+    }
+}
+
 impl From<&[u8]> for BulkString {
     fn from(s: &[u8]) -> Self {
         BulkString(s.to_vec())
