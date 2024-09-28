@@ -36,6 +36,7 @@ pub trait CommandExecutor {
     fn execute(self, backend: &Backend) -> RespFrame;
 }
 
+#[derive(Debug)]
 #[enum_dispatch(CommandExecutor)]
 pub enum Command {
     Get(Get),
