@@ -1,7 +1,7 @@
 use crate::cmd::{
     extract_args, validate_command, CommandError, CommandExecutor, HGet, HGetAll, HSet, RESP_OK,
 };
-use crate::{Backend, BulkString, RespArray, RespFrame};
+use crate::{Backend, RespArray, RespFrame, RespMap};
 
 impl CommandExecutor for HGet {
     fn execute(self, backend: &Backend) -> RespFrame {
@@ -18,22 +18,13 @@ impl CommandExecutor for HGetAll {
         match hmap {
             None => RespArray::new([]).into(),
             Some(hmap) => {
-                let mut data = Vec::with_capacity(hmap.len());
+                let mut map = RespMap::new();
+
                 for item in hmap.iter() {
                     let key = item.key().to_owned();
-                    data.push((key, item.value().clone()));
+                    map.insert(key, item.value().to_owned());
                 }
-
-                if self.sort {
-                    data.sort_by(|a, b| a.0.cmp(&b.0));
-                }
-
-                let ret: Vec<RespFrame> = data
-                    .into_iter()
-                    .flat_map(|(k, v)| vec![BulkString::from(k).into(), v])
-                    .collect();
-
-                RespArray::new(ret).into()
+                map.into()
             }
         }
     }
@@ -105,5 +96,110 @@ impl TryFrom<RespArray> for HSet {
                 "Invalid key, field or value".to_string(),
             )),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{Backend, RespDecode, RespMap};
+    use crate::{RespArray, RespFrame};
+    use bytes::BytesMut;
+
+    use crate::cmd::{CommandExecutor, HGet, HGetAll, HSet, RESP_OK};
+    use anyhow::Result;
+
+    #[test]
+    fn test_hget_from_resp_array() -> Result<()> {
+        let mut buf = BytesMut::new();
+
+        // cmd = hget map hello
+        buf.extend_from_slice(b"*3\r\n$4\r\nhget\r\n$3\r\nmap\r\n$5\r\nhello\r\n");
+
+        let resp_array = RespArray::decode(&mut buf)?;
+
+        let hget_cmd: HGet = resp_array.try_into()?;
+
+        assert_eq!(hget_cmd.key, "map");
+        assert_eq!(hget_cmd.field, "hello");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_hget_all_from_resp_array() -> Result<()> {
+        let mut buf = BytesMut::new();
+        // cmd = hgetall map
+        buf.extend_from_slice(b"*2\r\n$7\r\nhgetall\r\n$3\r\nmap\r\n");
+
+        let resp_array = RespArray::decode(&mut buf)?;
+        let hget_all_cmd: HGetAll = resp_array.try_into()?;
+
+        assert_eq!(hget_all_cmd.key, "map");
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_hset_from_resp_array() -> Result<()> {
+        let mut buf = BytesMut::new();
+        // cmd = hset map hello world
+        buf.extend_from_slice(b"*4\r\n$4\r\nhset\r\n$3\r\nmap\r\n$5\r\nhello\r\n$5\r\nworld\r\n");
+
+        let resp_array = RespArray::decode(&mut buf)?;
+
+        let hset_cmd: HSet = resp_array.try_into()?;
+
+        assert_eq!(hset_cmd.key, "map");
+        assert_eq!(hset_cmd.field, "hello");
+        assert_eq!(hset_cmd.value, RespFrame::BulkString(b"world".into()));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_hset_hgetall_commands() -> Result<()> {
+        let backend = Backend::new();
+
+        let cmd = HSet {
+            key: "map".into(),
+            field: "hello".into(),
+            value: RespFrame::BulkString(b"world".into()),
+        };
+
+        let result = cmd.execute(&backend);
+        assert_eq!(result, RESP_OK.clone());
+
+        let cmd = HSet {
+            key: "map".into(),
+            field: "hello1".into(),
+            value: RespFrame::BulkString(b"world1".into()),
+        };
+
+        cmd.execute(&backend);
+
+        let cmd = HGet {
+            key: "map".into(),
+            field: "hello1".into(),
+        };
+
+        let result = cmd.execute(&backend);
+        assert_eq!(result, RespFrame::BulkString(b"world1".into()));
+
+        let cmd = HGetAll {
+            key: "map".into(),
+            sort: false,
+        };
+
+        let result = cmd.execute(&backend);
+
+        let mut expected = RespMap::new();
+        expected.insert("hello".to_string(), RespFrame::BulkString(b"world".into()));
+        expected.insert(
+            "hello1".to_string(),
+            RespFrame::BulkString(b"world1".into()),
+        );
+
+        assert_eq!(result, expected.into());
+        Ok(())
     }
 }

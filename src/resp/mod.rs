@@ -287,6 +287,6 @@ mod tests {
 
     #[test]
     fn test_convert() {
-        let frame: RespFrame = SimpleString::new("tome").into();
+        let _frame: RespFrame = SimpleString::new("tome").into();
     }
 }
