@@ -21,9 +21,12 @@ impl CommandExecutor for Set {
 impl TryFrom<RespArray> for Get {
     type Error = CommandError;
 
+    // 解析整个 cmd
+    // "get" "hello"
     fn try_from(value: RespArray) -> Result<Self, Self::Error> {
         validate_command(&value, &["get"], 1)?;
 
+        // 跳过第一个 "get" 返回的只有 "hello"
         let mut args = extract_args(value, 1)?.into_iter();
 
         match args.next() {

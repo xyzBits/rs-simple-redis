@@ -234,6 +234,7 @@ impl RespDecode for BulkString {
     }
 }
 
+// 把一个 respArray 解析成 Frame 的数组，因为一个 Array 中包含多个 frame
 // - array: "*<number-of-elements>\r\n<element-1>...<element-n>"
 // - "*2\r\n$3\r\nget\r\n$5\r\nhello\r\n"
 // FIXME: need to handle incomplete

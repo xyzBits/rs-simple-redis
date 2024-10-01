@@ -87,6 +87,8 @@ impl Decoder for RespFrameCodec {
         src: &mut BytesMut,
     ) -> std::result::Result<Option<Self::Item>, Self::Error> {
         info!("decode stream to frame");
+
+        // 调用 decode 模块，将 bytes 转换为 frame
         match RespFrame::decode(src) {
             Ok(frame) => Ok(Some(frame)),
             Err(RespError::NotComplete) => Ok(None),

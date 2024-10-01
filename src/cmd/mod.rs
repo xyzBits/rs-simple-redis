@@ -101,6 +101,14 @@ impl TryFrom<RespArray> for Command {
     type Error = CommandError;
 
     fn try_from(value: RespArray) -> Result<Self, Self::Error> {
+        // "get" "hello"
+        // let x = b"get";
+        // let x1 = "get".as_bytes().as_ref();
+        // match x1 {
+        //     b"get" => println!("hello"),
+        //     _ => println!("world"),
+        // };
+
         match value.first() {
             Some(RespFrame::BulkString(ref cmd)) => match cmd.as_ref() {
                 b"get" => Ok(Get::try_from(value)?.into()),
@@ -127,6 +135,7 @@ impl CommandExecutor for Unrecognized {
     }
 }
 
+// "get" "hello"
 fn validate_command(
     value: &RespArray,
     names: &[&'static str],
@@ -164,4 +173,38 @@ fn validate_command(
 
 fn extract_args(value: RespArray, start: usize) -> Result<Vec<RespFrame>, CommandError> {
     Ok(value.0.into_iter().skip(start).collect::<Vec<RespFrame>>())
+}
+
+#[cfg(test)]
+mod test {
+    use crate::cmd::{Command, CommandExecutor};
+    use crate::{Backend, RespArray, RespDecode, RespFrame, RespNull};
+    use anyhow::Result;
+    use bytes::BytesMut;
+
+    #[test]
+    fn test_command() -> Result<()> {
+        let mut buf = BytesMut::new();
+
+        // 以 * 号开头，证明里面有多这个 frame，那么整体是一个 RespArray
+        // $ 开头的，证明是  bulkString
+        buf.extend_from_slice(b"*2\r\n$3\r\nget\r\n$5\r\nhello\r\n");
+
+        let frame = RespArray::decode(&mut buf)?;
+
+        // 把这个 frame 的 array 转成一个 cmd
+        // 比如 get hello 里面有两个 frame get 和 hello
+        // 从中抽取出 get 已经参数 hello
+        let cmd: Command = frame.try_into()?;
+
+        println!("{:?}", cmd);
+
+        let backend = Backend::new();
+
+        let ret = cmd.execute(&backend);
+
+        assert_eq!(ret, RespFrame::Null(RespNull));
+
+        Ok(())
+    }
 }
