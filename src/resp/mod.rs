@@ -1,11 +1,28 @@
+mod array;
+mod bool;
+mod bulk_string;
 mod decode;
+mod double;
 mod encode;
+mod frame;
+mod integer;
+mod map;
+mod null;
+mod set;
+mod simple_error;
+mod simple_string;
 
-use bytes::BytesMut;
+use crate::resp::frame::RespFrame;
+use crate::resp::simple_string::SimpleString;
+use bytes::{Buf, BytesMut};
 use enum_dispatch::enum_dispatch;
-use std::collections::BTreeMap;
 use std::ops::{Deref, DerefMut};
 use thiserror::Error;
+
+pub const BUF_CAP: usize = 1024 * 4;
+
+pub const CRLF: &[u8] = b"\r\n";
+pub const CRLF_LEN: usize = CRLF.len();
 
 // trait 上也要注明 enum dispatch
 #[enum_dispatch]
@@ -52,35 +69,93 @@ pub enum RespError {
     ParseFloatError(#[from] std::num::ParseFloatError),
 }
 
-// 在 enum 上注明你要使用哪个 trait ，然后 enum 的成员都要实现 这个 trait
-// enum dispatch 会为 enum 中的成员实现 from 和 into
-// 枚举中的这些成员的 结构，都要实现 RespEncode，否则 编译无法通过
-#[enum_dispatch(RespEncode)]
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
-pub enum RespFrame {
-    SimpleString(SimpleString),
+fn extract_fixed_data(
+    buf: &mut BytesMut,
+    expect: &str,
+    expect_type: &str,
+) -> Result<(), RespError> {
+    if buf.len() < expect.len() {
+        return Err(RespError::NotComplete);
+    }
 
-    Error(SimpleError),
+    if !buf.starts_with(expect.as_bytes()) {
+        return Err(RespError::InvalidFrameType(format!(
+            "expect: {}, got: {:?}",
+            expect_type, buf
+        )));
+    }
 
-    Integer(i64),
+    buf.advance(expect.len());
+    Ok(())
+}
 
-    BulkString(BulkString),
+fn extract_simple_frame_data(buf: &[u8], prefix: &str) -> Result<usize, RespError> {
+    if buf.len() < 3 {
+        return Err(RespError::NotComplete);
+    }
 
-    NullBulkString(RespNullBulkString),
+    if !buf.starts_with(prefix.as_bytes()) {
+        return Err(RespError::InvalidFrameType(format!(
+            "expect: SimpleString({}), got: {:?}",
+            prefix, buf
+        )));
+    }
 
-    Array(RespArray),
+    let end = find_crlf(buf, 1).ok_or(RespError::NotComplete)?;
 
-    NullArray(RespNullArray),
+    Ok(end)
+}
 
-    Null(RespNull),
+// find nth CRLF in the buffer
+fn find_crlf(buf: &[u8], nth: usize) -> Option<usize> {
+    let mut count = 0;
+    for i in 1..buf.len() - 1 {
+        if buf[i] == b'\r' && buf[i + 1] == b'\n' {
+            count += 1;
+            if count == nth {
+                return Some(i);
+            }
+        }
+    }
 
-    Boolean(bool),
+    None
+}
 
-    Double(f64),
+fn parse_length(buf: &[u8], prefix: &str) -> Result<(usize, usize), RespError> {
+    let end = extract_simple_frame_data(buf, prefix)?;
+    let s = String::from_utf8_lossy(&buf[prefix.len()..end]);
+    Ok((end, s.parse()?))
+}
 
-    Map(RespMap),
+fn calc_total_length(buf: &[u8], end: usize, len: usize, prefix: &str) -> Result<usize, RespError> {
+    let mut total = end + CRLF_LEN;
+    let mut data = &buf[total..];
+    match prefix {
+        "*" | "~" => {
+            // find nth CRLF in the buffer, for array and set, we need to find 1 CRLF for each element
+            for _ in 0..len {
+                let len = RespFrame::expect_length(data)?;
+                data = &data[len..];
+                total += len;
+            }
+            Ok(total)
+        }
+        "%" => {
+            // find nth CRLF in the buffer. For map, we need to find 2 CRLF for each key-value pair
+            for _ in 0..len {
+                let len = SimpleString::expect_length(data)?;
 
-    Set(RespSet),
+                data = &data[len..];
+                total += len;
+
+                let len = RespFrame::expect_length(data)?;
+                data = &data[len..];
+                total += len;
+            }
+            Ok(total)
+        }
+        _ => Ok(len + CRLF_LEN),
+    }
 }
 
 // impl RespFrame {
@@ -88,205 +163,3 @@ pub enum RespFrame {
 //         todo!()
 //     }
 // }
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
-pub struct SimpleString(String);
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
-pub struct SimpleError(String);
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
-pub struct BulkString(pub(crate) Vec<u8>);
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
-pub struct RespNull;
-
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
-pub struct RespArray(pub(crate) Vec<RespFrame>);
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
-pub struct RespNullArray;
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
-pub struct RespNullBulkString;
-
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
-pub struct RespMap(BTreeMap<String, RespFrame>);
-
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
-pub struct RespSet(Vec<RespFrame>);
-
-// 我们要直接访问里面包裹的数据，所以需要 deref
-impl Deref for SimpleString {
-    type Target = String;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl Deref for SimpleError {
-    type Target = String;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl Deref for BulkString {
-    type Target = Vec<u8>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl Deref for RespArray {
-    type Target = Vec<RespFrame>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl Deref for RespMap {
-    type Target = BTreeMap<String, RespFrame>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-// 实现了 deref 只能使用 immutable deref
-impl DerefMut for RespMap {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
-
-impl Deref for RespSet {
-    type Target = Vec<RespFrame>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl SimpleString {
-    pub fn new(s: impl Into<String>) -> SimpleString {
-        SimpleString(s.into())
-    }
-}
-
-impl SimpleError {
-    pub fn new(s: impl Into<String>) -> SimpleError {
-        SimpleError(s.into())
-    }
-}
-
-impl BulkString {
-    pub fn new(s: impl Into<Vec<u8>>) -> BulkString {
-        BulkString(s.into())
-    }
-}
-
-impl RespArray {
-    pub fn new(s: impl Into<Vec<RespFrame>>) -> RespArray {
-        RespArray(s.into())
-    }
-}
-
-impl RespMap {
-    pub fn new() -> RespMap {
-        RespMap(BTreeMap::new())
-    }
-}
-
-impl Default for RespMap {
-    fn default() -> Self {
-        RespMap::new()
-    }
-}
-
-impl RespSet {
-    pub fn new(s: impl Into<Vec<RespFrame>>) -> RespSet {
-        RespSet(s.into())
-    }
-}
-
-impl From<&str> for SimpleString {
-    fn from(s: &str) -> Self {
-        SimpleString(s.to_string())
-    }
-}
-
-impl From<&str> for RespFrame {
-    fn from(s: &str) -> Self {
-        SimpleString(s.to_string()).into()
-    }
-}
-
-impl From<&str> for SimpleError {
-    fn from(s: &str) -> Self {
-        SimpleError(s.to_string())
-    }
-}
-
-impl From<&str> for BulkString {
-    fn from(s: &str) -> Self {
-        BulkString(s.as_bytes().to_vec())
-    }
-}
-
-impl From<String> for BulkString {
-    fn from(value: String) -> Self {
-        BulkString(value.as_bytes().to_vec())
-    }
-}
-
-impl From<&[u8]> for BulkString {
-    fn from(s: &[u8]) -> Self {
-        BulkString(s.to_vec())
-    }
-}
-
-impl From<&[u8]> for RespFrame {
-    fn from(s: &[u8]) -> Self {
-        BulkString(s.to_vec()).into()
-    }
-}
-
-impl<const N: usize> From<&[u8; N]> for BulkString {
-    fn from(s: &[u8; N]) -> Self {
-        BulkString(s.to_vec())
-    }
-}
-
-impl<const N: usize> From<&[u8; N]> for RespFrame {
-    fn from(s: &[u8; N]) -> Self {
-        BulkString(s.to_vec()).into()
-    }
-}
-
-impl AsRef<str> for SimpleString {
-    fn as_ref(&self) -> &str {
-        &self.0
-    }
-}
-
-// 用于将一个类型转换为另一个类型的引用
-impl AsRef<[u8]> for BulkString {
-    fn as_ref(&self) -> &[u8] {
-        &self.0
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{RespFrame, SimpleString};
-
-    #[test]
-    fn test_convert() {
-        let _frame: RespFrame = SimpleString::new("tome").into();
-    }
-}
