@@ -1,12 +1,15 @@
-use crate::resp::extract_simple_frame_data;
-use crate::{RespDecode, RespEncode, RespError, CRLF_LEN};
-use bytes::BytesMut;
 use std::ops::Deref;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
-pub struct SimpleError(String);
+use bytes::BytesMut;
 
-// error: "-Error message\r\n"
+use crate::{RespDecode, RespEncode, RespError};
+
+use super::{extract_simple_frame_data, CRLF_LEN};
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
+pub struct SimpleError(pub(crate) String);
+
+// - error: "-Error message\r\n"
 impl RespEncode for SimpleError {
     fn encode(self) -> Vec<u8> {
         format!("-{}\r\n", self.0).into_bytes()
@@ -30,7 +33,7 @@ impl RespDecode for SimpleError {
 }
 
 impl SimpleError {
-    pub fn new(s: impl Into<String>) -> SimpleError {
+    pub fn new(s: impl Into<String>) -> Self {
         SimpleError(s.into())
     }
 }
@@ -46,5 +49,31 @@ impl Deref for SimpleError {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::RespFrame;
+
+    use super::*;
+    use anyhow::Result;
+
+    #[test]
+    fn test_error_encode() {
+        let frame: RespFrame = SimpleError::new("Error message".to_string()).into();
+
+        assert_eq!(frame.encode(), b"-Error message\r\n");
+    }
+
+    #[test]
+    fn test_simple_error_decode() -> Result<()> {
+        let mut buf = BytesMut::new();
+        buf.extend_from_slice(b"-Error message\r\n");
+
+        let frame = SimpleError::decode(&mut buf)?;
+        assert_eq!(frame, SimpleError::new("Error message".to_string()));
+
+        Ok(())
     }
 }

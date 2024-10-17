@@ -1,9 +1,7 @@
 mod array;
 mod bool;
 mod bulk_string;
-mod decode;
 mod double;
-mod encode;
 mod frame;
 mod integer;
 mod map;
@@ -12,63 +10,56 @@ mod set;
 mod simple_error;
 mod simple_string;
 
-use crate::resp::frame::RespFrame;
-use crate::resp::simple_string::SimpleString;
 use bytes::{Buf, BytesMut};
 use enum_dispatch::enum_dispatch;
-use std::ops::{Deref, DerefMut};
 use thiserror::Error;
 
-pub const BUF_CAP: usize = 1024 * 4;
+const BUF_CAP: usize = 4096;
+const CRLF: &[u8] = b"\r\n";
+const CRLF_LEN: usize = CRLF.len();
 
-pub const CRLF: &[u8] = b"\r\n";
-pub const CRLF_LEN: usize = CRLF.len();
+pub use self::{
+    array::{RespArray, RespNullArray},
+    bulk_string::{BulkString, RespNullBulkString},
+    frame::RespFrame,
+    map::RespMap,
+    null::RespNull,
+    set::RespSet,
+    simple_error::SimpleError,
+    simple_string::SimpleString,
+};
 
-// trait 上也要注明 enum dispatch
 #[enum_dispatch]
 pub trait RespEncode {
-    // 为什么要把 self 直接 consume
     fn encode(self) -> Vec<u8>;
 }
 
-/// decode 将字节数据转为 需要的数据结构
-/// 表示一个类型的大小在编译期是已知的，也就是说，编译器可以在编译时确定该类型所占的内存空间
-/// 实现 RespDecode 的 类型必须有固定的大小，意味着实现这个 trait 的类型不能是动态大小的类型，例如 Vec<T> String
 pub trait RespDecode: Sized {
     const PREFIX: &'static str;
-
-    // 拿到一个 bytesMut，然后对里面的数据进行 decode
     fn decode(buf: &mut BytesMut) -> Result<Self, RespError>;
-
     fn expect_length(buf: &[u8]) -> Result<usize, RespError>;
 }
 
-/// anyhow 帮你自动 convert error
-/// this error 灵活的转换 error
-#[derive(Debug, Error, PartialEq, Eq)]
+#[derive(Error, Debug, PartialEq, Eq)]
 pub enum RespError {
     #[error("Invalid frame: {0}")]
     InvalidFrame(String),
-
     #[error("Invalid frame type: {0}")]
     InvalidFrameType(String),
-
-    #[error("Invalid frame length: {0}")]
+    #[error("Invalid frame length： {0}")]
     InvalidFrameLength(isize),
-
     #[error("Frame is not complete")]
     NotComplete,
 
     #[error("Parse error: {0}")]
     ParseIntError(#[from] std::num::ParseIntError),
-
     #[error("Utf8 error: {0}")]
-    Utf8Error(#[from] std::str::Utf8Error),
-
+    Utf8Error(#[from] std::string::FromUtf8Error),
     #[error("Parse float error: {0}")]
     ParseFloatError(#[from] std::num::ParseFloatError),
 }
 
+// utility functions
 fn extract_fixed_data(
     buf: &mut BytesMut,
     expect: &str,
@@ -158,8 +149,23 @@ fn calc_total_length(buf: &[u8], end: usize, len: usize, prefix: &str) -> Result
     }
 }
 
-// impl RespFrame {
-//     pub fn encode(&self) -> Vec<u8> {
-//         todo!()
-//     }
-// }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use anyhow::Result;
+
+    #[test]
+    fn test_calc_array_length() -> Result<()> {
+        let buf = b"*2\r\n$3\r\nset\r\n$5\r\nhello\r\n";
+        let (end, len) = parse_length(buf, "*")?;
+        let total_len = calc_total_length(buf, end, len, "*")?;
+        assert_eq!(total_len, buf.len());
+
+        let buf = b"*2\r\n$3\r\nset\r\n";
+        let (end, len) = parse_length(buf, "*")?;
+        let ret = calc_total_length(buf, end, len, "*");
+        assert_eq!(ret.unwrap_err(), RespError::NotComplete);
+
+        Ok(())
+    }
+}

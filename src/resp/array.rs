@@ -1,7 +1,10 @@
-use crate::resp::{calc_total_length, extract_fixed_data, parse_length, BUF_CAP};
-use crate::{RespDecode, RespEncode, RespError, RespFrame, CRLF_LEN};
-use bytes::{Buf, BytesMut};
 use std::ops::Deref;
+
+use bytes::{Buf, BytesMut};
+
+use crate::{RespDecode, RespEncode, RespError, RespFrame};
+
+use super::{calc_total_length, extract_fixed_data, parse_length, BUF_CAP, CRLF_LEN};
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct RespArray(pub(crate) Vec<RespFrame>);
@@ -9,25 +12,18 @@ pub struct RespArray(pub(crate) Vec<RespFrame>);
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
 pub struct RespNullArray;
 
-//array: "*<number-of-elements>\r\n<element-1>...<element-n>"
-//         - "*2\r\n$3\r\nget\r\n$5\r\nhello\r\n"
+// - array: "*<number-of-elements>\r\n<element-1>...<element-n>"
 impl RespEncode for RespArray {
     fn encode(self) -> Vec<u8> {
         let mut buf = Vec::with_capacity(BUF_CAP);
-
-        let prefix = format!("*{}\r\n", self.0.len()).into_bytes();
-        buf.extend_from_slice(&prefix);
-
+        buf.extend_from_slice(&format!("*{}\r\n", self.0.len()).into_bytes());
         for frame in self.0 {
-            // 这里的 encode 方法由 enum dispatch 路由
             buf.extend_from_slice(&frame.encode());
         }
-
         buf
     }
 }
 
-// 把一个 respArray 解析成 Frame 的数组，因为一个 Array 中包含多个 frame
 // - array: "*<number-of-elements>\r\n<element-1>...<element-n>"
 // - "*2\r\n$3\r\nget\r\n$5\r\nhello\r\n"
 // FIXME: need to handle incomplete
@@ -57,7 +53,7 @@ impl RespDecode for RespArray {
     }
 }
 
-// null array: "*-1\r\n"
+// - null array: "*-1\r\n"
 impl RespEncode for RespNullArray {
     fn encode(self) -> Vec<u8> {
         b"*-1\r\n".to_vec()
@@ -77,7 +73,7 @@ impl RespDecode for RespNullArray {
 }
 
 impl RespArray {
-    pub fn new(s: impl Into<Vec<RespFrame>>) -> RespArray {
+    pub fn new(s: impl Into<Vec<RespFrame>>) -> Self {
         RespArray(s.into())
     }
 }
@@ -90,9 +86,59 @@ impl Deref for RespArray {
     }
 }
 
-// 实现了 deref 只能使用 immutable deref
-// impl DerefMut for RespMap {
-//     fn deref_mut(&mut self) -> &mut Self::Target {
-//         &mut self.0
-//     }
-// }
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::BulkString;
+    use anyhow::Result;
+
+    #[test]
+    fn test_array_encode() {
+        let frame: RespFrame = RespArray::new(vec![
+            BulkString::new("set".to_string()).into(),
+            BulkString::new("hello".to_string()).into(),
+            BulkString::new("world".to_string()).into(),
+        ])
+        .into();
+        assert_eq!(
+            &frame.encode(),
+            b"*3\r\n$3\r\nset\r\n$5\r\nhello\r\n$5\r\nworld\r\n"
+        );
+    }
+
+    #[test]
+    fn test_null_array_encode() {
+        let frame: RespFrame = RespNullArray.into();
+        assert_eq!(frame.encode(), b"*-1\r\n");
+    }
+
+    #[test]
+    fn test_null_array_decode() -> Result<()> {
+        let mut buf = BytesMut::new();
+        buf.extend_from_slice(b"*-1\r\n");
+
+        let frame = RespNullArray::decode(&mut buf)?;
+        assert_eq!(frame, RespNullArray);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_array_decode() -> Result<()> {
+        let mut buf = BytesMut::new();
+        buf.extend_from_slice(b"*2\r\n$3\r\nset\r\n$5\r\nhello\r\n");
+
+        let frame = RespArray::decode(&mut buf)?;
+        assert_eq!(frame, RespArray::new([b"set".into(), b"hello".into()]));
+
+        buf.extend_from_slice(b"*2\r\n$3\r\nset\r\n");
+        let ret = RespArray::decode(&mut buf);
+        assert_eq!(ret.unwrap_err(), RespError::NotComplete);
+
+        buf.extend_from_slice(b"$5\r\nhello\r\n");
+        let frame = RespArray::decode(&mut buf)?;
+        assert_eq!(frame, RespArray::new([b"set".into(), b"hello".into()]));
+
+        Ok(())
+    }
+}

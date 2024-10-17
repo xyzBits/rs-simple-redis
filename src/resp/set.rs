@@ -1,23 +1,21 @@
-use crate::resp::frame::RespFrame;
-use crate::resp::{calc_total_length, parse_length};
-use crate::{RespDecode, RespEncode, RespError, BUF_CAP, CRLF_LEN};
 use bytes::{Buf, BytesMut};
+
+use crate::{RespDecode, RespEncode, RespError, RespFrame};
 use std::ops::Deref;
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
-pub struct RespSet(Vec<RespFrame>);
+use super::{calc_total_length, parse_length, BUF_CAP, CRLF_LEN};
 
-// set: "~<number-of-elements>\r\n<element-1>...<element-n>"
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
+pub struct RespSet(pub(crate) Vec<RespFrame>);
+
+// - set: "~<number-of-elements>\r\n<element-1>...<element-n>"
 impl RespEncode for RespSet {
     fn encode(self) -> Vec<u8> {
         let mut buf = Vec::with_capacity(BUF_CAP);
-
         buf.extend_from_slice(&format!("~{}\r\n", self.len()).into_bytes());
-
         for frame in self.0 {
             buf.extend_from_slice(&frame.encode());
         }
-
         buf
     }
 }
@@ -51,7 +49,7 @@ impl RespDecode for RespSet {
 }
 
 impl RespSet {
-    pub fn new(s: impl Into<Vec<RespFrame>>) -> RespSet {
+    pub fn new(s: impl Into<Vec<RespFrame>>) -> Self {
         RespSet(s.into())
     }
 }
@@ -61,5 +59,43 @@ impl Deref for RespSet {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use crate::{BulkString, RespArray};
+    use anyhow::Result;
+
+    #[test]
+    fn test_set_encode() {
+        let frame: RespFrame = RespSet::new([
+            RespArray::new([1234.into(), true.into()]).into(),
+            BulkString::new("world".to_string()).into(),
+        ])
+        .into();
+        assert_eq!(
+            frame.encode(),
+            b"~2\r\n*2\r\n:+1234\r\n#t\r\n$5\r\nworld\r\n"
+        );
+    }
+
+    #[test]
+    fn test_set_decode() -> Result<()> {
+        let mut buf = BytesMut::new();
+        buf.extend_from_slice(b"~2\r\n$3\r\nset\r\n$5\r\nhello\r\n");
+
+        let frame = RespSet::decode(&mut buf)?;
+        assert_eq!(
+            frame,
+            RespSet::new(vec![
+                BulkString::new(b"set".to_vec()).into(),
+                BulkString::new(b"hello".to_vec()).into()
+            ])
+        );
+
+        Ok(())
     }
 }

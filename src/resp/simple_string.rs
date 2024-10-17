@@ -1,12 +1,21 @@
-use crate::resp::extract_simple_frame_data;
-use crate::{RespDecode, RespEncode, RespError, CRLF_LEN};
-use bytes::BytesMut;
 use std::ops::Deref;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
-pub struct SimpleString(String);
+use bytes::BytesMut;
 
-// simple string: "+OK\r\n"
+use crate::{RespDecode, RespEncode, RespError};
+
+use super::{extract_simple_frame_data, CRLF_LEN};
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd)]
+pub struct SimpleString(pub(crate) String);
+
+impl SimpleString {
+    pub fn new(s: impl Into<String>) -> Self {
+        SimpleString(s.into())
+    }
+}
+
+// - simple string: "+OK\r\n"
 impl RespEncode for SimpleString {
     fn encode(self) -> Vec<u8> {
         format!("+{}\r\n", self.0).into_bytes()
@@ -28,20 +37,6 @@ impl RespDecode for SimpleString {
         Ok(end + CRLF_LEN)
     }
 }
-impl SimpleString {
-    pub fn new(s: impl Into<String>) -> SimpleString {
-        SimpleString(s.into())
-    }
-}
-
-// 我们要直接访问里面包裹的数据，所以需要 deref
-impl Deref for SimpleString {
-    type Target = String;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
 
 impl From<&str> for SimpleString {
     fn from(s: &str) -> Self {
@@ -52,5 +47,48 @@ impl From<&str> for SimpleString {
 impl AsRef<str> for SimpleString {
     fn as_ref(&self) -> &str {
         &self.0
+    }
+}
+
+impl Deref for SimpleString {
+    type Target = String;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::RespFrame;
+    use anyhow::Result;
+    use bytes::BufMut;
+
+    #[test]
+    fn test_simple_string_encode() {
+        let frame: RespFrame = SimpleString::new("OK".to_string()).into();
+
+        assert_eq!(frame.encode(), b"+OK\r\n");
+    }
+
+    #[test]
+    fn test_simple_string_decode() -> Result<()> {
+        let mut buf = BytesMut::new();
+        buf.extend_from_slice(b"+OK\r\n");
+
+        let frame = SimpleString::decode(&mut buf)?;
+        assert_eq!(frame, SimpleString::new("OK".to_string()));
+
+        buf.extend_from_slice(b"+hello\r");
+
+        let ret = SimpleString::decode(&mut buf);
+        assert_eq!(ret.unwrap_err(), RespError::NotComplete);
+
+        buf.put_u8(b'\n');
+        let frame = SimpleString::decode(&mut buf)?;
+        assert_eq!(frame, SimpleString::new("hello".to_string()));
+
+        Ok(())
     }
 }
